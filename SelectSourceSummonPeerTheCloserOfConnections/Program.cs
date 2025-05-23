@@ -20,34 +20,39 @@ var sessionHandle = "";
 if (iWantToCrash)
 {
     var tcs = new TaskCompletionSource<PortalResponse>();
-    await connection.AddMatchAsync(
-        new MatchRule()
-        {
-            Type = MessageType.Signal, Member = "Response", Interface = "org.freedesktop.portal.Request",
-        },
-        reader: (Message message, object? o) =>
-        {
-            Console.WriteLine("Reading message");
-            var reader = message.GetBodyReader();
-            var arg0 = reader.ReadUInt32();
-            var arg1 = reader.ReadDictionaryOfStringToVariantValue();
-            return new PortalResponse() { RequestPath = message.PathAsString, Results = arg1 };
-        },
-        handler: (Exception? ex, PortalResponse? response, object? _, object? _) =>
-        {
-            if (ex is null)
-            {
-                System.Console.WriteLine($"Received response for {response.RequestPath}");
-                tcs.SetResult(response);
-            }
-            else
-            {
-                System.Console.WriteLine($"!!!!ERROR!!!!! {ex.Message}");
-            }
-        },
-        ObserverFlags.None);
-    var sessPath = await screenCast.CreateSessionAsync(options);
-    sessionHandle = (await tcs.Task).Results["session_handle"].ToString();
+    using (await connection.AddMatchAsync(
+               new MatchRule()
+               {
+                   Type = MessageType.Signal, Member = "Response", Interface = "org.freedesktop.portal.Request",
+               },
+               reader: (Message message, object? o) =>
+               {
+                   Console.WriteLine("Reading message");
+                   var reader = message.GetBodyReader();
+                   var arg0 = reader.ReadUInt32();
+                   var arg1 = reader.ReadDictionaryOfStringToVariantValue();
+                   return new PortalResponse() { RequestPath = message.PathAsString, Results = arg1 };
+               },
+               handler: (Exception? ex, PortalResponse? response, object? _, object? _) =>
+               {
+                   if (ex is null)
+                   {
+                       System.Console.WriteLine($"Received response for {response.RequestPath}");
+                       tcs.SetResult(response);
+                   }
+                   else
+                   {
+                       System.Console.WriteLine($"!!!!ERROR!!!!! {ex.Message}");
+                   }
+               },
+               ObserverFlags.NoSubscribe))
+    {
+        Console.WriteLine("Creating session");
+        var sessPath = await screenCast.CreateSessionAsync(options);
+        sessionHandle = (await tcs.Task).Results["session_handle"].ToString();
+        Console.WriteLine("Got session");
+    }
+    Console.WriteLine("Disposed watcher, connection will be unhappy now");
 }
 else
 {
@@ -56,7 +61,7 @@ else
 }
 
 var screenCfg = new Dictionary<string, VariantValue>();
-
+Console.WriteLine($"Session handle: {sessionHandle}");
 Console.WriteLine(await screenCast.SelectSourcesAsync(sessionHandle, screenCfg));
 
 class PortalResponse
